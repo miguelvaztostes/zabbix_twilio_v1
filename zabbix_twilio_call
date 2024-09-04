@@ -1,0 +1,43 @@
+import os
+import time
+from twilio.rest import Client
+import docker
+
+# Configurações da Twilio
+account_sid = '' 
+auth_token = ''    
+twilio_number = ''     
+recipient_number = ''  
+
+client = Client(account_sid, auth_token)
+
+docker_client = docker.from_env()
+
+zabbix_container_name = 'zabbix-server'
+
+def make_call():
+    call = client.calls.create(
+        to=recipient_number,
+        from_=twilio_number,
+        url="http://demo.twilio.com/docs/voice.xml" 
+    )
+    print(f"Chamada realizada com SID: {call.sid}")
+
+def check_logs_and_alert():
+    try:
+        container = docker_client.containers.get(zabbix_container_name)
+        logs = container.logs(tail=10, stream=False).decode('utf-8')  
+
+        if "High" in logs or "Disaster" in logs:
+            print("Problema detectado com severidade High ou Disaster.")
+            make_call()
+        else:
+            print("Nenhum problema crítico detectado.")
+    
+    except Exception as e:
+        print(f"Erro ao verificar logs: {e}")
+
+
+while True:
+    check_logs_and_alert()
+    time.sleep(60)  
